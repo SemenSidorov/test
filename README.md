@@ -4,4 +4,4 @@
 4. Выполнить импорт инфоблока из файла "export_file_PzanTxATYNHwPZhN.csv" разделители точка с запятой
 5. Проверить работоспособность задания
 
-Возможные ошибки: Неверно задан id инфоблока в файлах ./l/index.php стр. 9 и ./data/local/templates/test/ajax.php стр. 42 
+Возможные ошибки: Неверно задан id инфоблока в файлах ./l/index.php стр. 9 и ./data/local/templates/test/ajax.php стр. 43
