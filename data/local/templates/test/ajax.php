@@ -5,18 +5,17 @@ require($_SERVER["DOCUMENT_ROOT"] . "/bitrix/modules/main/include/prolog_before.
 ?>
 
 <?
+function new_hash(){
+
+    $length = rand(5, 11);
+
+    return substr(str_shuffle('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'), 1, $length);
+
+}
+
 if (empty($_REQUEST['link'])) { 
 
     $value = '<h5 style="color: red;">Не заполнено обязательное поле: "Ваша ссылка"</h5>';
-    setcookie("errors", $value, time()+10, "/");
-    setcookie("request", json_encode($_REQUEST), time()+10, "/");
-    setcookie("send", "", time());
-    header("Location: ".$_SERVER["HTTP_REFERER"]);
-    die;
-
-} elseif (empty($_REQUEST['name'])) { 
-
-    $value = '<h5 style="color: red;">Не заполнено обязательное поле: "Слово, на которое будет заменена ссылка"</h5>';
     setcookie("errors", $value, time()+10, "/");
     setcookie("request", json_encode($_REQUEST), time()+10, "/");
     setcookie("send", "", time());
@@ -36,19 +35,12 @@ if (empty($_REQUEST['link'])) {
     
     $siteUrl = ((!empty($_SERVER['HTTPS'])) ? 'https' : 'http') . '://' . $_SERVER['SERVER_NAME'];
 
+    $hash = new_hash();
+
     CModule::IncludeModule('iblock');
 
     $el = new CIBlockElement;
     $iblock_id = 1;
-
-    $fields = array(
-        "DATE_CREATE" => date("d.m.Y H:i:s"),
-        "CREATED_BY" => $GLOBALS['USER']->GetID(),
-        "IBLOCK_ID" => $iblock_id,
-        "NAME" => strip_tags($_REQUEST['link']),
-        "DETAIL_TEXT" => strip_tags($_REQUEST['name']),
-        "ACTIVE" => "Y",
-    );
 
     if(isset($_POST['time']) && !empty($_POST['time'])){ 
         $fields["ACTIVE_TO"] = date("d.m.Y H:i:s", time() + $_POST['time']); 
@@ -61,27 +53,35 @@ if (empty($_REQUEST['link'])) {
         array("DATE_ACTIVE_TO" => false),
     ), "ACTIVE" => "Y", "NAME" => strip_tags($_REQUEST['link'])], false, false, []);
 
-    $filter_text = CIBlockElement::GetList([], ["IBLOCK_ID" => $iblock_id, 
-    array(
-        "LOGIC" => "OR",
-        array(">DATE_ACTIVE_TO" => date("d.m.Y H:i:s")),
-        array("DATE_ACTIVE_TO" => false),
-    ), "ACTIVE" => "Y", "DETAIL_TEXT" => strip_tags($_REQUEST['name'])], false, false, []);
+    $check_hash = true;
 
-    if($e = $filter_name->GetNext()){
-        $value = '<h5 style="color: red;">Данная ссылка уже сокращалась (Сокращённая ссылка: '.$siteUrl."/l/".$e["DETAIL_TEXT"].')</h5>';
-        setcookie("errors", $value, time()+10, "/");
-        setcookie("request", json_encode($_REQUEST), time()+10, "/");
-        setcookie("send", "", time());
-        header("Location: ".$_SERVER["HTTP_REFERER"]);
-        die;
+    while($check_hash){
+
+        $filter_text = CIBlockElement::GetList([], ["IBLOCK_ID" => $iblock_id, 
+        array(
+            "LOGIC" => "OR",
+            array(">DATE_ACTIVE_TO" => date("d.m.Y H:i:s")),
+            array("DATE_ACTIVE_TO" => false),
+        ), "ACTIVE" => "Y", "DETAIL_TEXT" => $hash], false, false, []);
+
+        if($e = $filter_text->GetNext()){ $hash = new_hash(); } else { $check_hash = false; }
+
     }
 
-    elseif($e = $filter_text->GetNext()){
-        $value = '<h5 style="color: red;">Данное сокращение уже используется для '.$e["NAME"].'</h5>';
-        setcookie("errors", $value, time()+10, "/");
-        setcookie("request", json_encode($_REQUEST), time()+10, "/");
-        setcookie("send", "", time());
+    $fields = array(
+        "DATE_CREATE" => date("d.m.Y H:i:s"),
+        "CREATED_BY" => $GLOBALS['USER']->GetID(),
+        "IBLOCK_ID" => $iblock_id,
+        "NAME" => strip_tags($_REQUEST['link']),
+        "DETAIL_TEXT" => $hash,
+        "ACTIVE" => "Y",
+    );
+
+    if($e = $filter_name->GetNext()){
+        $value = $siteUrl.'/l/'.$e["DETAIL_TEXT"];
+        setcookie("send", $value, time()+10, "/");
+        setcookie("errors", "", time());
+        setcookie("request", "", time());
         header("Location: ".$_SERVER["HTTP_REFERER"]);
         die;
     }
@@ -96,7 +96,7 @@ if (empty($_REQUEST['link'])) {
     }
     
     elseif ($ID = $el->Add($fields)) {
-        $value = $siteUrl.'/l/'.strip_tags($_REQUEST["name"]);
+        $value = $siteUrl.'/l/'.$hash;
         setcookie("send", $value, time()+10, "/");
         setcookie("errors", "", time());
         setcookie("request", "", time());
